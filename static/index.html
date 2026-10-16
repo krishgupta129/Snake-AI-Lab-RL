@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snake AI Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1120;--panel:#111827;--line:#263449;--muted:#9aa9bd;--text:#eef4ff;--green:#34d399;--blue:#38bdf8;--amber:#f59e0b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#15243b 0,#0b1120 55%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);min-height:100vh}
+main{max-width:1200px;margin:auto;padding:28px 20px 40px}
+header{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:22px}
+h1{font-size:clamp(25px,4vw,36px);margin:0;letter-spacing:-.04em}
+h1 span{color:var(--green)} .sub{color:var(--muted);margin:7px 0 0;font-size:14px}
+.pill{border:1px solid #285b4c;background:#10352d;color:#9ff3d4;border-radius:999px;padding:8px 12px;font-size:12px;white-space:nowrap}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.metric,.panel{background:linear-gradient(145deg,rgba(20,31,49,.96),rgba(15,23,42,.96));border:1px solid var(--line);border-radius:16px}
+.metric{padding:16px 18px}.label{color:var(--muted);font-size:12px;letter-spacing:.04em;text-transform:uppercase}.value{font-size:25px;font-weight:700;margin-top:8px;font-variant-numeric:tabular-nums}
+.layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+.panel{padding:18px;min-width:0}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+h2{font-size:16px;margin:0}.small{color:var(--muted);font-size:12px}
+canvas{display:block;width:100%;height:auto;border-radius:12px}
+#game{background:#0b1220;border:1px solid #263449;aspect-ratio:4/3}
+#graph{background:#0b1220;border:1px solid #263449;aspect-ratio:1.7}
+.controls{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.speed-box{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:12px;background:rgba(8,15,29,.45)}
+.speed-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.speed-title{font-size:13px;font-weight:700}.speed-value{color:var(--green);font-size:13px;font-weight:750;font-variant-numeric:tabular-nums}
+.speed-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.speed-btn{padding:9px 4px;background:#101b2c;border-color:#2b3a50}.speed-btn.active{background:#0f9f74;border-color:#18b786;color:#031b14}.speed-hint{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+button{border:1px solid #35445b;background:#1c2a40;color:var(--text);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:650;cursor:pointer;transition:transform .12s,background .12s}
+button:hover{background:#293c56}button:active{transform:scale(.98)}button.primary{background:#0f9f74;border-color:#18b786;color:#031b14}button:disabled{opacity:.5;cursor:wait}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.foot{color:var(--muted);font-size:12px;line-height:1.6;margin:18px 2px 0}
+.status{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.status i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+@media(max-width:780px){main{padding:18px 12px}.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}header{align-items:flex-start}.pill{display:none}.panel{padding:13px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>🐍 Snake <span>AI Lab</span></h1><p class="sub">Deep Q-Learning in real time · PyTorch backend · Live browser animation</p></div>
+  <div class="pill">● MODEL EXISTS IN MEMORY ONLY</div>
+</header>
+<section class="metrics">
+  <div class="metric"><div class="label">Training time</div><div class="value" id="timer">00:00:00</div></div>
+  <div class="metric"><div class="label">Episode</div><div class="value" id="episode">0</div></div>
+  <div class="metric"><div class="label">Best score</div><div class="value" id="best">0</div></div>
+  <div class="metric"><div class="label">Current score</div><div class="value" id="score">0</div></div>
+</section>
+<section class="layout">
+  <article class="panel">
+    <div class="panel-head"><h2>Live training environment</h2><div class="status"><i id="statusDot"></i><span id="statusText">Connecting…</span></div></div>
+    <canvas id="game" width="640" height="480" aria-label="Animated snake training board"></canvas>
+    <div class="controls">
+      <button class="primary" id="start">▶ Start</button><button id="pause">Ⅱ Pause</button><button id="reset">↻ Reset agent</button>
+    </div>
+    <p class="small" id="moves" style="margin:12px 0 0">Moves processed: 0</p>
+    <div class="speed-box">
+      <div class="speed-head"><span class="speed-title">Training speed</span><span class="speed-value" id="speedValue">60% · Balanced</span></div>
+      <div class="speed-options" role="group" aria-label="Training speed">
+        <button class="speed-btn" data-speed="20">20%</button>
+        <button class="speed-btn" data-speed="40">40%</button>
+        <button class="speed-btn active" data-speed="60">60%</button>
+        <button class="speed-btn" data-speed="80">80%</button>
+        <button class="speed-btn" data-speed="100">100%</button>
+      </div>
+      <p class="speed-hint">Lower speeds reduce how quickly the AI takes training steps and help keep CPU usage manageable. 100% is the original maximum pace.</p>
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-head"><h2>Learning progress</h2><span class="small">Latest 300 episodes</span></div>
+    <canvas id="graph" width="640" height="375" aria-label="Episode score and rolling average graph"></canvas>
+    <div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Episode score</span><span><i class="dot" style="background:var(--amber)"></i>Rolling average (20)</span></div>
+    <p class="small" id="graphNote" style="margin:14px 0 0">Graph points appear after each episode ends.</p>
+  </article>
+</section>
+<p class="foot">Each browser connection gets its own independent agent and Snake environment. Training is temporary: closing this tab discards that session, and model weights are never written to disk. Public hosting resources are shared, so many simultaneous visitors may slow training.</p>
+</main>
+<script>
+const gameCanvas=document.getElementById('game'),ctx=gameCanvas.getContext('2d');
+const graphCanvas=document.getElementById('graph'),gctx=graphCanvas.getContext('2d');
+let socket=null,latest=null,previous=null,lastPacketAt=0,packetDuration=90,packetBaseElapsed=0,packetReceivedAt=0;
+let paused=false,connecting=true,elapsedAtPause=0,localStart=performance.now(),localRunning=true;
+let trainingSpeed=60;
+const speedNames={20:'Very slow',40:'Slow',60:'Balanced',80:'Fast',100:'Maximum'};
+const $=id=>document.getElementById(id);
+function connect(){
+  const scheme=location.protocol==='https:'?'wss':'ws';
+  socket=new WebSocket(`${scheme}://${location.host}/ws`);
+  socket.onopen=()=>{connecting=false;$('statusText').textContent='Training';$('statusDot').style.background='#34d399';command('speed',trainingSpeed);};
+  socket.onmessage=e=>{
+    let s;try{s=JSON.parse(e.data)}catch{return}
+    if(s.type!=='state')return;
+    if(latest){previous=latest;packetDuration=Math.max(50,performance.now()-lastPacketAt)}
+    latest=s;lastPacketAt=performance.now();packetReceivedAt=lastPacketAt;
+    packetBaseElapsed=s.elapsed;
+    paused=!s.training;localRunning=s.training;elapsedAtPause=s.elapsed;
+    $('episode').textContent=s.episode.toLocaleString();
+    $('best').textContent=s.best_score;
+    $('score').textContent=s.score;
+    $('moves').textContent=`Moves processed: ${s.steps.toLocaleString()}`;
+    $('statusText').textContent=s.training?'Training': 'Paused';
+    $('statusDot').style.background=s.training?'#34d399':'#f59e0b';
+    $('start').disabled=s.training;$('pause').disabled=!s.training;
+    drawGraph(s.scores||[]);
+  };
+  socket.onclose=()=>{connecting=true;$('statusText').textContent='Disconnected';$('statusDot').style.background='#fb7185';};
+  socket.onerror=()=>{$('statusText').textContent='Connection issue';};
+}
+function command(command,value){if(socket&&socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({command,value}))}
+$('start').onclick=()=>command('start');$('pause').onclick=()=>command('pause');$('reset').onclick=()=>{command('reset')};
+document.querySelectorAll('[data-speed]').forEach(button=>button.addEventListener('click',()=>{
+  trainingSpeed=Number(button.dataset.speed);
+  document.querySelectorAll('[data-speed]').forEach(b=>b.classList.toggle('active',b===button));
+  $('speedValue').textContent=`${trainingSpeed}% · ${speedNames[trainingSpeed]}`;
+  command('speed',trainingSpeed);
+}));
+function roundedRect(c,x,y,w,h,r,color){c.fillStyle=color;c.beginPath();c.roundRect(x,y,w,h,r);c.fill()}
+function drawGame(now){
+ const w=gameCanvas.width,h=gameCanvas.height,cell=latest?.block_size||20;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1220';ctx.fillRect(0,0,w,h);
+ for(let x=0;x<=w;x+=cell){ctx.strokeStyle='#1d293b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+.5,0);ctx.lineTo(x+.5,h);ctx.stroke()}
+ for(let y=0;y<=h;y+=cell){ctx.strokeStyle='#1d293b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(w,y+.5);ctx.stroke()}
+ if(!latest){ctx.fillStyle='#9aa9bd';ctx.font='16px system-ui';ctx.textAlign='center';ctx.fillText('Connecting to Python training server…',w/2,h/2);return}
+ const progress=Math.min(1,Math.max(0,(now-lastPacketAt)/packetDuration));
+ const cur=latest.snake||[],prev=previous?.snake||cur;
+ const mix=(a,b,t)=>a+(b-a)*t;
+ // Interpolate each body segment between server snapshots for smooth 60fps drawing.
+ for(let i=cur.length-1;i>=0;i--){
+   let p=cur[i],q=prev[Math.min(i,prev.length-1)]||p;
+   let x=mix(q[0],p[0],progress),y=mix(q[1],p[1],progress);
+   const inset=1.5,rad=5;
+   roundedRect(ctx,x+inset,y+inset,cell-2*inset,cell-2*inset,rad,i===0?'#6ee7b7':'#10b981');
+   if(i===0){ctx.fillStyle='#052e2b';ctx.beginPath();ctx.arc(x+cell*.68,y+cell*.34,1.8,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(x+cell*.68,y+cell*.67,1.8,0,Math.PI*2);ctx.fill()}
+ }
+ const [fx,fy]=latest.food;ctx.shadowColor='#fb7185';ctx.shadowBlur=12;roundedRect(ctx,fx+3,fy+3,cell-6,cell-6,6,'#fb5b69');ctx.shadowBlur=0;
+ ctx.fillStyle='#f1f5f9';ctx.font='bold 14px system-ui';ctx.textAlign='left';ctx.fillText(`SCORE  ${latest.score}`,12,25);
+ if(!latest.training){ctx.fillStyle='rgba(3,8,18,.55)';ctx.fillRect(0,0,w,h);ctx.fillStyle='#f8fafc';ctx.textAlign='center';ctx.font='bold 24px system-ui';ctx.fillText('Training paused',w/2,h/2)}
+}
+function drawGraph(scores){
+ const w=graphCanvas.width,h=graphCanvas.height,pad={l:46,r:18,t:30,b:38};
+ gctx.clearRect(0,0,w,h);gctx.fillStyle='#0b1220';gctx.fillRect(0,0,w,h);
+ const plotW=w-pad.l-pad.r,plotH=h-pad.t-pad.b;
+ const averages=scores.map((_,i)=>{const part=scores.slice(Math.max(0,i-19),i+1);return part.reduce((a,b)=>a+b,0)/part.length});
+ const max=Math.max(1,...scores,...averages)*1.15;
+ gctx.font='12px system-ui';gctx.textAlign='right';gctx.textBaseline='middle';
+ for(let i=0;i<=4;i++){const y=pad.t+i*plotH/4;gctx.strokeStyle='#263449';gctx.beginPath();gctx.moveTo(pad.l,y);gctx.lineTo(w-pad.r,y);gctx.stroke();gctx.fillStyle='#9aa9bd';gctx.fillText((max*(1-i/4)).toFixed(1),pad.l-8,y)}
+ gctx.strokeStyle='#64748b';gctx.beginPath();gctx.moveTo(pad.l,pad.t);gctx.lineTo(pad.l,h-pad.b);gctx.lineTo(w-pad.r,h-pad.b);gctx.stroke();
+ function line(values,color,width){if(!values.length)return;gctx.strokeStyle=color;gctx.lineWidth=width;gctx.lineJoin='round';gctx.lineCap='round';gctx.beginPath();values.forEach((v,i)=>{const x=pad.l+(values.length===1?0:i/(values.length-1)*plotW),y=pad.t+plotH-v/max*plotH;if(i===0)gctx.moveTo(x,y);else gctx.lineTo(x,y)});gctx.stroke()}
+ line(scores,'#38bdf8',2);line(averages,'#f59e0b',2.5);
+ gctx.textAlign='left';gctx.textBaseline='alphabetic';gctx.fillStyle='#9aa9bd';gctx.fillText(scores.length?`Episode ${Math.max(1,latest.episode-scores.length+1)}`:'Waiting for first episode',pad.l,h-12);
+ gctx.textAlign='right';if(scores.length)gctx.fillText(`Episode ${latest.episode}`,w-pad.r,h-12);
+ $('graphNote').textContent=scores.length?`${scores.length} episodes recorded · rolling average uses up to 20 episodes.`:'Graph points appear after each episode ends.';
+}
+function frame(now){
+ drawGame(now);
+ if(latest){
+  let elapsed=latest.elapsed;
+  if(latest.training)elapsed+=(now-packetReceivedAt)/1000;
+  elapsed=Math.max(0,Math.floor(elapsed));
+  $('timer').textContent=[Math.floor(elapsed/3600),Math.floor((elapsed%3600)/60),elapsed%60].map(n=>String(n).padStart(2,'0')).join(':');
+ }
+ requestAnimationFrame(frame);
+}
+connect();requestAnimationFrame(frame);
+</script>
+</body></html>
