@@ -94,7 +94,12 @@ def live_training_panel():
     left, right = st.columns([1.1, 1], gap="large")
     with left:
         st.subheader("Live game")
-        st.image(game.render(), use_container_width=True)
+        game_placeholder = st.empty()
+        game_placeholder.image(
+            game.render(),
+            use_container_width=True,
+            output_format="PNG",
+        )
         status = "🟢 Training" if st.session_state.training else "⏸ Paused"
         st.caption(f"{status} · Moves processed: {st.session_state.steps:,}")
     with right:
